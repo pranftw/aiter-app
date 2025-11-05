@@ -1,68 +1,105 @@
 # aiter
 
-A powerful terminal-based AI chat interface built with OpenTUI and React, featuring a modular agent system with Model Context Protocol (MCP) integration.
-
-Built on top of the **[Vercel AI SDK](https://github.com/vercel/ai)** and **[OpenTUI](https://github.com/sst/opentui)**, combining provider-agnostic AI tooling with a modern terminal UI framework.
-
-## Why aiter?
-
-While tools like Claude Code and other CLI AI agents offer powerful AI assistance, aiter gives you something different: **complete control over how you interact with AI**.
-
-### Built on Three Principles
-
-**Controllability**: Own the entire agentic loop — decide iteration limits, control tool execution flow, and customize streaming behavior. Build AI workflows that match your mental model, not a vendor's.
-
-**Extensibility**: Run any model via Vercel AI SDK. Configure MCP servers easily. Define custom tools and commands. Create specialized agents for different tasks. No black boxes, no proprietary abstractions.
-
-**Customizability**: Terminal-first means scriptable, pipeable, and CI/CD-ready. Modify the UI with React. Inspect and edit conversation JSON directly. Full local control with no telemetry.
-
-**For developers who want to build with AI, not just use it.** Perfect for experimentation, MCP testing, custom workflows, and understanding how AI interactions actually work.
-
-## Features
-
-### Core Capabilities
-- **Terminal User Interface (TUI)**: Beautiful, interactive chat interface powered by OpenTUI
-- **Multi-Agent System**: Create and switch between custom AI agents with different configurations
-- **Persistent Chat Sessions**: All conversations are saved as JSON files for easy resumption
-- **MCP Integration**: Connect to external tools and services via Model Context Protocol
-  - Supports stdio, SSE, and HTTP transport types
-  - Dynamic tool loading from MCP servers
-  - Easy configuration per agent
-
-### Extensibility
-- **File-System Based Agent Organization**: Next.js-like convention-based structure — agents organized by directory with standardized folders (commands/, tools/, mcps/, system-prompts/)
-- **Custom Slash Commands**: Define agent-specific or global slash commands with yargs-style argument parsing
-- **Custom AI Tools**: Add local tools that the AI can use during conversations
-- **Flexible System Prompts**: Customize AI behavior with markdown-based system prompts
-- **Custom Data Schema**: Define typed data structures for agent-specific state management
-- **Stdin Support**: Pipe prompts directly from shell commands or scripts
+Built with [aiter](https://github.com/pranftw/aiter)
 
 ## Installation
 ```bash
-git clone https://github.com/pranftw/aiter.git
-cd aiter
-mkdir chats
-bun install
 cp .env.template .env # add the envvars
+bun run src/index.tsx -a <AGENT_NAME>
 ```
+
+## Agents
+
+### Code Execution with MCP: A Dynamic Approach (codex-mcp)
+
+![codex-mcp architecture](public/images/codex-mcp.png)
+
+```bash
+bun run src/index.tsx -a codex-mcp
+```
+
+The [Anthropic blog post](https://www.anthropic.com/engineering/code-execution-mcp) introduced code execution with MCP through filesystem-based tool organization—generating `.ts` files for each tool to enable progressive discovery and efficient data processing.
+
+#### The Filesystem Approach Challenges
+
+Generating and maintaining tool files creates significant overhead:
+
+- **Initial generation complexity**: For each MCP tool, generate a TypeScript file with correct interfaces, types, and exports
+- **Type system management**: Handle optional parameters, union types, nested objects, arrays, and complex schemas across hundreds of files
+- **Synchronization burden**: When a tool's schema changes on the MCP server, all generated files must be regenerated
+- **Build pipeline overhead**: Requires compilation, bundling, and distribution of generated code
+- **Version conflicts**: Different MCP servers may update at different times, causing mismatches between generated files and actual tool definitions
+- **Disk space**: Thousands of tools = thousands of files to store, version control, and distribute
+
+**codex-mcp** eliminates all of this. Everything is dynamic and in-memory—tools are always in sync because they're accessed directly from the live MCP connection.
+
+#### Progressive Tool Discovery (No Filesystem)
+
+Two lightweight tools replace file exploration:
+
+```typescript
+// Discover available tools
+list_mcp_tools() 
+→ ['exa__search', 'gdrive__get_document', 'salesforce__update_record', ...]
+
+// Load only what you need
+get_mcp_tool_details('gdrive__get_document')
+→ { description, inputSchema }
+```
+
+Same progressive loading behavior, zero files generated.
+
+#### In-Memory Snippet Execution
+
+Snippets stored directly in chat session data:
+
+```typescript
+// Create
+new_mcp_snippet({
+  description: 'Sync Google Drive to Salesforce',
+  content: `
+    async function main() {
+      const doc = await callMCPTool('gdrive__get_document', { docId: 'abc123' });
+      await callMCPTool('salesforce__update_record', { 
+        recordId: 'xyz',
+        data: { notes: doc.content }
+      });
+      return 'Synced successfully';
+    }
+    return await main();
+  `
+})
+
+// Execute instantly
+execute_mcp_snippet({ id: 'abc123' })
+```
+
+The `callMCPTool` function is injected directly into the execution environment—no imports, no filesystem, pure runtime injection.
+
+#### Complete Snippet Lifecycle
+
+```typescript
+preview_all_mcp_snippets()    // List all with descriptions
+read_mcp_snippet({ id, ... }) // Read with line numbers
+edit_mcp_snippet({ id, ... }) // Modify description or code
+delete_mcp_snippet({ id })    // Clean up
+```
+
+All MCP code execution benefits—progressive disclosure, context efficiency, powerful control flow, privacy preservation, state persistence—with zero filesystem overhead.
+
+#### Drawbacks
+
+While the dynamic approach offers significant advantages, the MCP protocol itself has a limitation: **it doesn't enforce output schemas**. This creates challenges when chaining tool calls together, as the model doesn't know what structure to expect from a tool's output.
+
+Without guaranteed output schemas, the agent must:
+- Make assumptions about the response structure
+- Handle variable or unpredictable return formats
+- Add defensive code for parsing and validation
+- Potentially make additional tool calls to verify output structure
+
+This is a protocol-level limitation affecting all MCP implementations, not specific to the dynamic approach.
 
 ## Example Usage
-
-### Basic Usage
-```bash
-# Start a new chat with the default agent
-bun run src/index.tsx
-# Start with a specific agent
-bun run src/index.tsx --agent example
-# Resume an existing chat session
-bun run src/index.tsx --chat chats/abc123.json
-# Start with an initial prompt
-bun run src/index.tsx --prompt "Hello, how are you?"
-# Pipe prompt from stdin
-echo "Explain TypeScript generics" | bun run src/index.tsx -
-# Combine options
-bun run src/index.tsx -a example -p "Let's discuss React patterns"
-```
 
 ## Customization
 
@@ -135,7 +172,7 @@ Edit `src/ai/agents/<AGENT_NAME>/schema.ts` to define typed data structures for 
 
 | Option | Alias | Type | Default | Description |
 |--------|-------|------|---------|-------------|
-| `--agent` | `-a` | string | `example` | Specify which agent to use (must exist in `src/ai/agents/`) |
+| `--agent` | `-a` | string | required | Specify which agent to use (must exist in `src/ai/agents/`) |
 | `--chat` | `-c` | string | `null` | Path to an existing chat session file to resume |
 | `--prompt` | `-p` | string | `null` | Initial prompt to send when starting the chat |
 | `--help` | `-h` | - | - | Display help information |
@@ -143,65 +180,6 @@ Edit `src/ai/agents/<AGENT_NAME>/schema.ts` to define typed data structures for 
 ### Special Input
 - **Stdin**: Use `-` as a positional argument to read the prompt from stdin
   ```bash
-  echo "My question" | bun run src/index.tsx -
+  echo "My question" | bun run src/index.tsx --agent example -
   ```
   Note: Cannot be combined with `--prompt`
-
-### Usage Examples
-```bash
-# Start with specific agent
-bun run src/index.tsx --agent my-custom-agent
-# Resume a chat
-bun run src/index.tsx --chat ./chats/xyz789.json
-# Quick one-off question
-bun run src/index.tsx -p "What is TypeScript?"
-# Pipe from command output
-cat question.txt | bun run src/index.tsx -
-# Combine agent and prompt
-bun run src/index.tsx -a example -p "Hello"
-# Get help
-bun run src/index.tsx --help
-```
-
-## Architecture
-
-### Key Components
-- **Chat Container**: Main UI component managing the chat interface
-- **Trigger System**: Extensible input processing (commands, context, etc.)
-- **MCP Manager**: Singleton managing Model Context Protocol clients and tools
-- **Command Registry**: Dynamic loading of builtin and agent-specific commands
-- **Custom Transport**: Bridge between UI and AI streaming
-
-### Agent System
-Each agent is isolated with its own:
-- Tool set (MCP tools + local tools)
-- Command registry (builtin + agent-specific)
-- System prompts and configuration
-- Message rendering logic
-- State schema
-
-### File Structure
-```
-src/
-├── ai/
-│   ├── agents/          # Agent definitions
-│   ├── custom-chat-transport.ts
-│   └── tools/           # Global tools (currently empty)
-├── components/
-│   ├── chat/           # Chat UI components
-│   └── triggers/       # Trigger UI components
-├── hooks/              # Custom React hooks
-├── lib/                # Shared schemas and utilities
-├── triggers/           # Trigger system
-│   ├── commands/       # Command trigger implementation
-│   └── core/           # Core trigger framework
-└── utils/              # Utility functions
-    ├── ai.ts           # AI/MCP utilities
-    ├── chat.ts         # Chat management
-    ├── mcp-manager.ts  # MCP client manager
-    └── yargs.ts        # CLI argument parsing
-```
-
-## Contributing
-
-Feel free to submit issues and enhancement requests!
