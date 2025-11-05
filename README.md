@@ -1,9 +1,14 @@
-# aiter
+# aiter-app
 
-Built with [aiter](https://github.com/pranftw/aiter)
+![aiter](public/images/aiter.png)
+
+Built with aiter ([github.com/pranftw/aiter](https://github.com/pranftw/aiter))
 
 ## Installation
 ```bash
+git clone https://github.com/pranftw/aiter-app.git
+cd aiter-app
+bun install
 cp .env.template .env # add the envvars
 bun run src/index.tsx -a <AGENT_NAME>
 ```
@@ -12,13 +17,13 @@ bun run src/index.tsx -a <AGENT_NAME>
 
 ### Code Execution with MCP: A Dynamic Approach (codex-mcp)
 
-![codex-mcp architecture](public/images/codex-mcp.png)
+![codex-mcp](public/images/codex-mcp.png)
 
 ```bash
 bun run src/index.tsx -a codex-mcp
 ```
 
-The [Anthropic blog post](https://www.anthropic.com/engineering/code-execution-mcp) introduced code execution with MCP through filesystem-based tool organization—generating `.ts` files for each tool to enable progressive discovery and efficient data processing.
+The Anthropic blog post [Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-mcp) demonstrates how agents can use code execution to interact with MCP servers more efficiently, avoiding the token overhead of loading all tool definitions upfront. Their approach generates `.ts` files for each tool to enable progressive discovery.
 
 #### The Filesystem Approach Challenges
 
@@ -31,7 +36,9 @@ Generating and maintaining tool files creates significant overhead:
 - **Version conflicts**: Different MCP servers may update at different times, causing mismatches between generated files and actual tool definitions
 - **Disk space**: Thousands of tools = thousands of files to store, version control, and distribute
 
-**codex-mcp** eliminates all of this. Everything is dynamic and in-memory—tools are always in sync because they're accessed directly from the live MCP connection.
+**codex-mcp** eliminates all of this. Everything is dynamic and in-memory. Tools are always in sync because they're accessed directly from the live MCP connection.
+
+This dynamic execution approach is made possible by [Vercel AI SDK](https://github.com/vercel/ai)'s comprehensive MCP support, which provides the runtime infrastructure to call MCP tools directly from code.
 
 #### Progressive Tool Discovery (No Filesystem)
 
@@ -74,7 +81,7 @@ new_mcp_snippet({
 execute_mcp_snippet({ id: 'abc123' })
 ```
 
-The `callMCPTool` function is injected directly into the execution environment—no imports, no filesystem, pure runtime injection.
+The `callMCPTool` function is injected directly into the execution environment: no imports, no filesystem, pure runtime injection.
 
 #### Complete Snippet Lifecycle
 
@@ -85,7 +92,7 @@ edit_mcp_snippet({ id, ... }) // Modify description or code
 delete_mcp_snippet({ id })    // Clean up
 ```
 
-All MCP code execution benefits—progressive disclosure, context efficiency, powerful control flow, privacy preservation, state persistence—with zero filesystem overhead.
+All MCP code execution benefits (progressive disclosure, context efficiency, powerful control flow, privacy preservation, state persistence) with zero filesystem overhead.
 
 #### Drawbacks
 
