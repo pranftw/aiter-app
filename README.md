@@ -51,7 +51,7 @@ list_mcp_tools()
 
 // Load only what you need
 get_mcp_tool_details('gdrive__get_document')
-→ { description, inputSchema }
+→ { description, inputSchema, outputSchema }
 ```
 
 Same progressive loading behavior, zero files generated.
@@ -83,6 +83,18 @@ execute_mcp_snippet({ id: 'abc123' })
 
 The `callMCPTool` function is injected directly into the execution environment: no imports, no filesystem, pure runtime injection.
 
+#### Meta-Agent Capabilities with callLLM
+
+Snippets have access to `callLLM`, which unlocks powerful metaprogramming capabilities:
+
+**Dynamic Agent Composition**: Agents can programmatically author and execute specialized sub-agents with custom system prompts, tool sets, and reasoning strategies. This enables recursive agent architectures where LLMs design their own multi-stage workflows.
+
+**Intelligent Tool Output Processing**: Rather than passing large MCP tool results directly to context, agents can invoke `callLLM` to process, filter, and extract only relevant information within the execution environment. This preserves context efficiency while maintaining the ability to work with large datasets.
+
+**Adaptive Workflows**: Combine `callMCPTool` and `callLLM` to create multi-stage pipelines that dynamically adjust their behavior based on intermediate results, enabling sophisticated orchestration patterns without context pollution.
+
+This metaprogramming environment opens possibilities for self-improving agents, dynamic task decomposition, and privacy-preserving data processing - all without filesystem overhead.
+
 #### Complete Snippet Lifecycle
 
 ```typescript
@@ -96,15 +108,15 @@ All MCP code execution benefits (progressive disclosure, context efficiency, pow
 
 #### Drawbacks
 
-While the dynamic approach offers significant advantages, the MCP protocol itself has a limitation: **it doesn't enforce output schemas**. This creates challenges when chaining tool calls together, as the model doesn't know what structure to expect from a tool's output.
+While the dynamic approach offers significant advantages, the MCP protocol itself has a limitation: **it doesn't enforce output schemas**. However, some MCP tools do provide optional output schemas, which agents can access via `get_mcp_tool_details`. When available, these schemas enable proper tool chaining by informing the agent about the expected output structure.
 
-Without guaranteed output schemas, the agent must:
+For tools without output schemas, the agent must:
 - Make assumptions about the response structure
 - Handle variable or unpredictable return formats
 - Add defensive code for parsing and validation
 - Potentially make additional tool calls to verify output structure
 
-This is a protocol-level limitation affecting all MCP implementations, not specific to the dynamic approach.
+This is a protocol-level limitation affecting all MCP implementations, not specific to the dynamic approach. Leveraging available output schemas when present helps mitigate this challenge.
 
 ## Example Usage
 

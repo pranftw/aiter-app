@@ -1,4 +1,4 @@
-import { tool } from "ai";
+import { tool, type Tool } from "ai";
 import { mcpManager } from "@aiter/core";
 import { z } from "zod";
 
@@ -9,7 +9,8 @@ const getMCPToolDetailsInputSchema = z.object({
 
 const getMCPToolDetailsOutputSchema = z.object({
   description: z.string(),
-  inputSchema: z.string()
+  inputSchema: z.string(),
+  outputSchema: z.string(),
 });
 
 export const get_mcp_tool_details = tool({
@@ -18,9 +19,11 @@ export const get_mcp_tool_details = tool({
   inputSchema: getMCPToolDetailsInputSchema,
   outputSchema: getMCPToolDetailsOutputSchema,
   execute: async ({ toolName }) => {
+    const tool: Tool = mcpManager.tools[toolName] as Tool;
     return {
-      description: mcpManager.tools[toolName].description,
-      inputSchema: mcpManager.tools[toolName].inputSchema,
+      description: tool.description,
+      inputSchema: JSON.stringify(tool.inputSchema),
+      outputSchema: tool.outputSchema?JSON.stringify(tool.outputSchema):undefined,
     };
   }
 });
